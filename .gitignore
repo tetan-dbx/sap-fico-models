@@ -1,0 +1,39 @@
+# --- Environment-specific bundle config (never commit) ---------------------------
+# Your real bundle root holds your workspace host, warehouse id and catalog names.
+# Copy databricks.yml.template -> databricks.yml and fill in the placeholders.
+databricks.yml
+databricks.yml.local
+*.local.yml
+
+# Databricks CLI / bundle state (deployment state, Terraform state, sync snapshots)
+.databricks/
+# Resource IDs tracked by the Databricks AI Dev Kit MCP tools
+.databricks-resources.json
+.databrickscfg
+
+# --- Private / non-redistributable assets ---------------------------------------
+# Customer logos and other brand assets: keep them local, pass them to
+# build_dashboard.py with --logo when you build a branded dashboard.
+src/dashboard/assets/
+# Reference material that is not part of the deployable project
+docs/mv-reference/
+
+# --- Secrets ----------------------------------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+
+# --- Python -----------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Editors / OS -----------------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp

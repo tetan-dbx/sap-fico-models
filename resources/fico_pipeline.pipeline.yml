@@ -1,0 +1,41 @@
+resources:
+  pipelines:
+    fico_pipeline:
+      name: "[${bundle.target}] SAP FICO Gold Pipeline"
+
+      # Publish all tables into the single target catalog.schema.
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+
+      # Development vs production pipeline mode follows the target `mode`
+      # (development targets run the pipeline in development mode automatically).
+      serverless: true
+      photon: true
+      channel: CURRENT
+
+      # Newer project layout: point the pipeline at a root and glob its transforms.
+      root_path: ../src/pipelines/fico
+      libraries:
+        - glob:
+            include: ../src/pipelines/fico/transformations/**
+
+      # Fully-qualified raw SAP source tables (the mounted SAP BDC data-product
+      # shares), read in code via spark.conf.get("source.<key>"). The catalog part
+      # comes from bundle variables; schema/table names are defined by the SAP data
+      # product. This block is the single source of truth: the column-comment task
+      # reads it back from the deployed pipeline.
+      configuration:
+        source.operationalacctgdocitem: ${var.source_catalog_entry_view_journal_entry}.entryviewjournalentry.operationalacctgdocitem
+        source.journalentry: ${var.source_catalog_journal_entry_header}.journalentryheader.journalentry
+        source.cashflow: ${var.source_catalog_cash_flow}.cashflow.cashflow
+        source.cashflowforecast: ${var.source_catalog_cash_flow}.cashflow.cashflowforecast
+        source.costcenter: ${var.source_catalog_cost_center}.costcenter.costcenter
+        source.costcentertext: ${var.source_catalog_cost_center}.costcenter.costcentertext
+        source.costcenterhierarchynode: ${var.source_catalog_cost_center}.costcenter.costcenterhierarchynode
+        source.supplier: ${var.source_catalog_supplier}.supplier.supplier
+        source.supplierwithholdingtax: ${var.source_catalog_supplier}.supplier.supplierwithholdingtax
+        source.country: ${var.source_catalog_country_region}.country.country
+
+      permissions:
+        - level: CAN_VIEW
+          group_name: users

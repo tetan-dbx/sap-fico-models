@@ -1,0 +1,91 @@
+# SAP FICO Semantic Layer — Databricks Asset Bundle (TEMPLATE)
+#
+# HOW TO USE
+#   cp databricks.yml.template databricks.yml      # databricks.yml is gitignored
+#   then replace every <PLACEHOLDER> below with values from your workspace.
+#
+#   <WORKSPACE_URL>     e.g. https://my-workspace.cloud.databricks.com
+#   <TARGET_CATALOG>    existing UC catalog that will hold the gold tables + metric views
+#   <TARGET_SCHEMA>     schema inside it (create first: CREATE SCHEMA <catalog>.<schema>)
+#   <SQL_WAREHOUSE_ID>  ID of a serverless or pro SQL warehouse
+#                       (SQL Warehouses → your warehouse → Overview → "ID")
+#   <COMPANY_NAME>      shown in the dashboard display name, e.g. "Contoso"
+#   source_catalog_*    the catalog names you chose when mounting each SAP BDC
+#                       data-product share (Catalog → OpenSharing → Shared with me)
+#
+# Any variable can also be overridden at deploy time without editing this file:
+#   databricks bundle deploy --var="catalog=my_catalog" --var="schema=sap_fico"
+#
+# What it deploys: a Spark Declarative Pipeline (silver → gold star schema) built
+# from the SAP data products, Unity Catalog metric views on top, an AI/BI
+# dashboard and four Genie spaces for self-service analytics.
+bundle:
+  name: sap_fico_model
+
+variables:
+  # --- Target (where the semantic layer is published) ---------------------------
+  catalog:
+    description: Target Unity Catalog for gold tables and metric views.
+    default: <TARGET_CATALOG>
+  schema:
+    description: Target schema for gold tables and metric views (must already exist).
+    default: <TARGET_SCHEMA>
+  warehouse_id:
+    description: SQL warehouse used to run metric-view (WITH METRICS) DDL, the dashboard and Genie.
+    default: <SQL_WAREHOUSE_ID>
+    # Alternative: resolve the ID from the warehouse name instead of hard-coding it.
+    # lookup:
+    #   warehouse: "<SQL_WAREHOUSE_NAME>"
+  customer_name:
+    description: Brand shown in the dashboard display name.
+    default: <COMPANY_NAME>
+
+  # --- Sources: catalogs you mounted from the SAP BDC data-product shares ------------
+  # Only the catalog name is configurable here; the schema/table names inside each
+  # share are defined by the SAP data product (see resources/fico_pipeline.pipeline.yml).
+  source_catalog_entry_view_journal_entry:
+    description: Catalog of the 'Entry View Journal Entry' data product share.
+    default: sap_shared_entry_view_journal_entry
+  source_catalog_journal_entry_header:
+    description: Catalog of the 'Journal Entry Header' data product share.
+    default: sap_shared_journal_entry_header
+  source_catalog_cash_flow:
+    description: Catalog of the 'Cash Flow' data product share.
+    default: sap_shared_cash_flow
+  source_catalog_cost_center:
+    description: Catalog of the 'Cost Center' data product share.
+    default: sap_shared_cost_center
+  source_catalog_supplier:
+    description: Catalog of the 'Supplier' data product share.
+    default: sap_shared_supplier
+  source_catalog_country_region:
+    description: Catalog of the 'Country / Region' data product share.
+    default: sap_shared_country_region
+
+include:
+  - resources/*.yml
+  # Genie spaces. Leave this commented out for the FIRST deploy into a new schema:
+  # the Genie API requires the metric views to exist, and they are created by
+  # `bundle run`. After the first successful run, uncomment and deploy again.
+  # - resources/genie/*.yml
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: <WORKSPACE_URL>
+
+  # Example production target: deploys as a service principal into a shared folder,
+  # with its own catalog/schema. Uncomment and fill in to use.
+  # prod:
+  #   mode: production
+  #   workspace:
+  #     host: <WORKSPACE_URL>
+  #     root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+  #   run_as:
+  #     service_principal_name: <SERVICE_PRINCIPAL_APPLICATION_ID>
+  #   variables:
+  #     catalog: <PROD_CATALOG>
+  #     schema: <PROD_SCHEMA>
+  #     warehouse_id: <PROD_SQL_WAREHOUSE_ID>

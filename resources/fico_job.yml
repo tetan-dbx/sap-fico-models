@@ -1,0 +1,57 @@
+resources:
+  jobs:
+    fico_semantic_layer:
+      name: "[${bundle.target}] SAP FICO Semantic Layer"
+
+      tasks:
+        # 1) Build the gold layer with the SDP pipeline.
+        - task_key: build_gold_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.fico_pipeline.id}
+            full_refresh: false
+
+        # 2) (Re)create the metric views on top of the gold tables.
+        - task_key: deploy_metric_views
+          depends_on:
+            - task_key: build_gold_pipeline
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/deploy/deploy_metric_views.py
+            parameters:
+              - "--metric_views_dir"
+              - "${workspace.file_path}/src/metric_views"
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+              - "--warehouse_id"
+              - "${var.warehouse_id}"
+
+        # 3) Carry source column comments onto silver/gold (idempotent; survives full refresh).
+        - task_key: apply_column_comments
+          depends_on:
+            - task_key: deploy_metric_views
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/deploy/apply_column_comments.py
+            parameters:
+              - "--transformations_dir"
+              - "${workspace.file_path}/src/pipelines/fico/transformations"
+              # Source tables are read from this pipeline's `configuration` block.
+              - "--pipeline_id"
+              - "${resources.pipelines.fico_pipeline.id}"
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+              - "--warehouse_id"
+              - "${var.warehouse_id}"
+
+      # Serverless environment for the Python deploy task (databricks-sdk is preinstalled).
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+
+      queue:
+        enabled: true

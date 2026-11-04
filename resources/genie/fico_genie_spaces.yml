@@ -1,0 +1,163 @@
+# Genie spaces for self-service analytics — one per FICO domain, each grounded on a
+# single semantic_* metric view (governed measures, so Genie reuses the same KPI
+# definitions as the dashboard). The space body is inline YAML so the metric-view
+# identifiers pick up ${var.catalog}/${var.schema}.
+#
+# ORDERING: the Genie API requires the referenced metric views to EXIST when a space
+# is created (databricks/cli#6750), and they are only created by `bundle run`. That is
+# why this file lives outside the default `resources/*.yml` glob: enable the
+# `resources/genie/*.yml` include in databricks.yml after the first successful run.
+#
+# To pull UI edits (instructions, sample SQL, …) back into code:
+#   databricks bundle generate genie-space --resource <key> --force
+# (that writes a .geniespace.json with fully-qualified names; re-apply the
+#  ${var.catalog}.${var.schema} substitution before committing).
+resources:
+  genie_spaces:
+    fico_genie_general_ledger:
+      title: "FICO · General Ledger"
+      description: |-
+        FICO General Ledger & Journal Analytics — accounting/controller domain over the curated metric view `${var.catalog}.${var.schema}.semantic_gl_journal_metrics` (SAP FICO Universal Journal lines). Grain: one accounting-document line.
+
+        Use this space for: debit / credit / net movement analysis by account, company, cost/profit center, segment; period and YTD movements; running (closing) balance, rolling-12-month and month-over-month trends; reversals; and posting-quality (entry lag).
+
+        Key semantics — follow these when generating SQL:
+        - Net Movement = debit − credit (signed). By double-entry, debits equal credits, so Net Movement across ALL accounts nets to ~0 — it is only meaningful WITH an account context: always group by or filter to G/L Account or Account Type.
+        - Revenue accounts carry a credit (negative) sign; expense accounts a debit (positive) sign.
+        - Debit (Local) and Credit (Local) are both shown as positive magnitudes.
+        - Closing Balance (Local) is a running cumulative that is only meaningful for BALANCE-SHEET accounts (assets/liabilities/equity). P&L accounts close each fiscal year, so filter to a specific account or a balance-sheet account type before using it.
+        - MoM Net Movement Growth % and other period-over-period ratios are only meaningful at an account or account-type grain (at aggregate the base is ~0).
+        - Functional currency equals local (company-code) currency in this dataset; there is no separate group/consolidation currency in the source.
+
+        Available measures include Journal Line Count, Accounting Document Count, Reversal Line Count, Debit (Local), Credit (Local), Net Movement (Local), Reversal Net Movement (Local), the Functional-currency equivalents, YTD Net Movement (Local), Closing Balance (Local), Rolling 12M Net Movement (Local), Prior Month Net Movement (Local), MoM Net Movement Growth %, and Average Entry Lag Days. Dimensions include Posting Month / Date / Year, Fiscal Year / Period / Quarter, Company, Ledger, Chart of Accounts, G/L Account, Account Type, Cost Center, Profit Center, Segment, Business Area, Controlling Area, Document Type, Transaction Code, Reversal, Trading Partner, and the currency dimensions.
+      warehouse_id: ${var.warehouse_id}
+      parent_path: ${workspace.root_path}
+      serialized_space:
+        version: 2
+        config:
+          sample_questions:
+            - id: "6a59424d351f4c9ab21c71db9eee23ac"
+              question: ["What was net movement by account type in 2024?"]
+            - id: "709d300753784ec295c57eb4202fffbd"
+              question: ["Show the top 10 G/L accounts by net movement in 2024"]
+            - id: "ad0ab8ebad05454eb0f0474d5f5a3e33"
+              question: ["What is YTD net movement by month for G/L accounts in 2024?"]
+            - id: "af9bf32f3fae4436b1254306c13c94c4"
+              question: ["How many reversal lines were posted by company in 2024?"]
+            - id: "f8619c22e594466280eda156b751dba4"
+              question: ["What was the average posting entry lag in days by month?"]
+            - id: "fa18ae6a794d4ca0911ceee5a69caacd"
+              question: ["Show debit and credit totals by company for 2024"]
+        data_sources:
+          tables:
+            - identifier: "${var.catalog}.${var.schema}.semantic_gl_journal_metrics"
+
+    fico_genie_cost_center:
+      title: "FICO · Cost Center & Controlling"
+      description: |-
+        FICO Cost Center / Controlling (CO) — cost-management / FP&A domain over the curated metric view `${var.catalog}.${var.schema}.semantic_cost_center_metrics` (SAP FICO). Grain: journal lines carrying a cost center (a controlling lens on the GL).
+
+        Use this space for: actual cost-center spend by cost center, department, category, company; roll-up across the standard cost-center hierarchy; and YTD spend trends.
+
+        Key semantics — follow these when generating SQL:
+        - Actual Spend (Local) = signed net posting amount on cost centers; expenses are positive (debits), credits/allocations reduce it.
+        - Roll spend UP the hierarchy using Hierarchy Level 0 (top/group) through Hierarchy Level 3.
+        - Functional currency equals local (company-code) currency in this dataset (Actual Spend Functional = Actual Spend Local); there is no separate group/consolidation currency in the source.
+        - Only lines with a cost center are in scope (the view is filtered to cost_center IS NOT NULL).
+
+        Available measures include Actual Spend (Local), Actual Spend (Functional), Debit (Local), Credit (Local), YTD Spend (Local), and Line Count. Dimensions include Posting Month, Posting Year, Company, Controlling Area, Cost Center, Cost Center Name, Department, Cost Center Category, Cost Center Hierarchy, Hierarchy Level 0–3, Profit Center, Account Type, and the currency dimensions.
+      warehouse_id: ${var.warehouse_id}
+      parent_path: ${workspace.root_path}
+      serialized_space:
+        version: 2
+        config:
+          sample_questions:
+            - id: "2482bc7b00a845fa9e1dd4ace887b515"
+              question: ["What were the top 10 cost centers by spend in 2024?"]
+            - id: "880259b50d7044e0b6650c871b045705"
+              question: ["Show actual spend by hierarchy level 1 for 2024"]
+            - id: "a27a53795a9d4db9b289fc45dc2dcdd4"
+              question: ["What was actual spend by department in 2024?"]
+            - id: "aa390636133c4c09b6d844d513611bd5"
+              question: ["What is year-to-date cost-center spend by month?"]
+            - id: "d42c2c41a40a4de68a4eac2d48de54c1"
+              question: ["Which departments have the highest spend?"]
+            - id: "e1c0e988634546a59831c095d6489332"
+              question: ["Show spend by cost center category"]
+        data_sources:
+          tables:
+            - identifier: "${var.catalog}.${var.schema}.semantic_cost_center_metrics"
+
+    fico_genie_cash_flow:
+      title: "FICO · Cash Flow & Liquidity"
+      description: |-
+        FICO Cash Flow & Liquidity — treasury/liquidity analytics over the curated metric view `${var.catalog}.${var.schema}.semantic_cash_flow_metrics` (SAP FICO). Grain: cash-flow records tagged actual vs forecast.
+
+        Use this space for: net cash flow (inflow / outflow / net) in transaction, local (company-code), and group currency; actual-vs-forecast analysis; and YTD / rolling-12-month liquidity trends.
+
+        Key semantics — follow these when generating SQL:
+        - Forecast VARIANCE (Actual − Forecast, in EUR and %) is the headline forecast metric — prefer it over accuracy.
+        - Forecast Accuracy % is floored to 0–100% (a miss over 100% of actual reads as 0%, never negative).
+        - Do NOT group by Scenario when using the variance/accuracy measures — they already compare actual vs forecast internally.
+        - Net Cash Flow (Group) is additive only within a single Global Currency (predominantly EUR); group or filter by Global Currency for a clean consolidated total.
+        - Amounts are signed: inflow positive, outflow negative; Cash Outflow is presented as a positive magnitude.
+
+        Available measures include Net Cash Flow (Local / Group / Transaction), Cash Inflow, Cash Outflow, Actual Net Cash Flow, Forecast Net Cash Flow, Forecast Variance, Forecast Variance %, Forecast Accuracy %, YTD Net Cash Flow (Local), Rolling 12M Net Cash Flow (Local), and Flow Count. Dimensions include Flow Month, Flow Year, Company, Scenario, Bank, Bank Country, and the three currency dimensions (Transaction / Company / Global Currency).
+      warehouse_id: ${var.warehouse_id}
+      parent_path: ${workspace.root_path}
+      serialized_space:
+        version: 2
+        config:
+          sample_questions:
+            - id: "11d40a03d3fa4018b99e838d8b08e10a"
+              question: ["What was net cash flow by month in 2024?"]
+            - id: "1f2b611cf0384d139a2280aea382f3ed"
+              question: ["Show cash inflow versus outflow by company for 2024"]
+            - id: "24b13146343c4a20814d4dd52a524adb"
+              question: ["What was the forecast variance by month in 2024?"]
+            - id: "35d411029af040988447511bc96b2038"
+              question: ["How accurate were our cash flow forecasts by month?"]
+            - id: "7a2a1674fe63463f9cd513c4e04a9de7"
+              question: ["What is year-to-date net cash flow by month?"]
+            - id: "829ec5ec57ad474a90c4b3793542450c"
+              question: ["What was net cash flow in group currency (EUR) by company?"]
+        data_sources:
+          tables:
+            - identifier: "${var.catalog}.${var.schema}.semantic_cash_flow_metrics"
+
+    fico_genie_working_capital:
+      title: "FICO · Working Capital (AR & AP)"
+      description: |-
+        FICO Working Capital — accounts receivable & payable open items, for credit & collections / AP / treasury. Over the curated metric view `${var.catalog}.${var.schema}.semantic_open_items_ar_ap_metrics` (SAP FICO). Grain: one open-item-managed AR (customer) or AP (vendor) line.
+
+        Use this space for: open and overdue balances, aging analysis, DSO / DPO, and top counterparties (customers/suppliers).
+
+        Key semantics — follow these when generating SQL:
+        - For days-to-pay/collect, prefer DSO / DPO (Amount-Weighted) — the business-standard, amount-weighted measure (AR = DSO, AP = DPO). 'Average Days To Clear (Simple)' is an unweighted reference only.
+        - Aging is measured to the As Of Date (the latest date present in the data), NOT today's date. Aging Bucket values are numbered so they sort: '1: 0-30', '2: 31-60', '3: 61-90', '4: 91-180', '5: 181-365', '6: 365+', plus 'Cleared'.
+        - AP (payables) amounts are stored NEGATIVE; AR (receivables) positive. For payable magnitudes use ABS(...) or present as positive.
+        - Overdue = open items past their net payment terms (days_open > net_payment_days).
+        - Open Amount counts only uncleared items; Total Amount includes cleared and open.
+
+        Available measures include Open Amount, Overdue Amount, Total Amount, Open Item Count, Overdue Item Count, Item Count, Cleared Item Count, DSO / DPO (Amount-Weighted), and Average Days To Clear (Simple). Dimensions include Posting Month / Date, Clearing Date, As Of Date, Company, AR / AP, Account Type, Supplier, Customer, G/L Account, Aging Bucket, and Open.
+      warehouse_id: ${var.warehouse_id}
+      parent_path: ${workspace.root_path}
+      serialized_space:
+        version: 2
+        config:
+          sample_questions:
+            - id: "5fd7eee5bd9c4e06b2b407030ed456d8"
+              question: ["What are our current DSO and DPO?"]
+            - id: "641fc746422344bcbce8b9f14d359914"
+              question: ["Show open receivables by aging bucket"]
+            - id: "6c8755ee5b9e4209af1ff8e2829de419"
+              question: ["Who are the top 10 customers by overdue amount?"]
+            - id: "eb39f193c9a84dba95d3b736e786314f"
+              question: ["What is the open payables balance by company?"]
+            - id: "ebaaa8feb0d74d288c3edcdceb269463"
+              question: ["How many open items are overdue?"]
+            - id: "ee85003353554191ad66f32362878d0c"
+              question: ["Show open amount by aging bucket for receivables"]
+        data_sources:
+          tables:
+            - identifier: "${var.catalog}.${var.schema}.semantic_open_items_ar_ap_metrics"

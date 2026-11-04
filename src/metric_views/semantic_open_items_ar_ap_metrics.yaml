@@ -1,0 +1,108 @@
+version: 1.1
+
+source: '`${catalog}`.`${schema}`.gold_fact_open_item'
+
+comment: "Accounts receivable & payable open items: open and overdue balances, aging buckets, and days-to-clear (DSO/DPO) signals."
+
+dimensions:
+  - name: Posting Month
+    expr: posting_month
+    comment: Calendar month of the item's posting date.
+
+  - name: Posting Date
+    expr: posting_date
+    comment: Posting date of the open item.
+
+  - name: Clearing Date
+    expr: clearing_date
+    comment: Date the item was cleared (null while open).
+
+  - name: As Of Date
+    expr: as_of_date
+    comment: Snapshot date used to age open items — the latest date present in the data (not today's calendar date), so aging reflects the dataset's own time frame.
+
+  - name: Company
+    expr: company_code
+    comment: SAP company code (legal entity).
+
+  - name: AR / AP
+    expr: ar_ap
+    comment: Receivable (AR) vs payable (AP).
+    synonyms: [receivable or payable]
+
+  - name: Account Type
+    expr: account_type_desc
+    comment: Customer (AR) or Vendor (AP).
+
+  - name: Supplier
+    expr: supplier
+    comment: Vendor number (payables).
+
+  - name: Customer
+    expr: customer
+    comment: Customer number (receivables).
+
+  - name: G/L Account
+    expr: gl_account
+    comment: Reconciliation G/L account.
+
+  - name: Aging Bucket
+    expr: aging_bucket
+    comment: "Aging band for open items, numbered for correct sort order: '1: 0-30', '2: 31-60', '3: 61-90', '4: 91-180', '5: 181-365', '6: 365+', or 'Cleared'. Measured from posting date to the as-of snapshot date."
+    synonyms: [age band, aging]
+
+  - name: Open
+    expr: is_open
+    comment: Whether the item is currently open (uncleared).
+
+measures:
+  - name: Open Amount
+    expr: SUM(open_amount)
+    comment: Sum of open (uncleared) amounts in company-code currency.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [outstanding, open balance]
+
+  - name: Overdue Amount
+    expr: SUM(open_amount) FILTER (WHERE is_open AND days_open > net_payment_days)
+    comment: Open amount past its net payment due date (days open beyond net payment terms).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [past due, overdue]
+
+  - name: Total Amount
+    expr: SUM(amount_in_cc_currency)
+    comment: Sum of all item amounts (open and cleared) in company-code currency.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Open Item Count
+    expr: COUNT_IF(is_open)
+    comment: Number of currently-open items.
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+
+  - name: Overdue Item Count
+    expr: COUNT_IF(is_open AND days_open > net_payment_days)
+    comment: Number of open items past their net payment due date.
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+
+  - name: Item Count
+    expr: COUNT(1)
+    comment: Number of AR/AP items.
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+
+  - name: Cleared Item Count
+    expr: COUNT_IF(NOT is_open)
+    comment: Number of cleared items.
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+
+  - name: DSO / DPO (Amount-Weighted)
+    expr: >-
+      SUM(days_to_clear * ABS(amount_in_cc_currency)) FILTER (WHERE days_to_clear IS NOT NULL)
+      / NULLIF(SUM(ABS(amount_in_cc_currency)) FILTER (WHERE days_to_clear IS NOT NULL), 0)
+    comment: "Amount-weighted average days from posting to clearing on cleared items — the business-standard DSO (for AR) / DPO (for AP): each item is weighted by its absolute amount, so large invoices dominate as they should. Backward-looking settlement time on cleared items (not a balance-based DSO)."
+    format: {type: number, decimal_places: {type: max, places: 1}}
+    synonyms: [dso, dpo, days to pay, days sales outstanding, days payable outstanding]
+
+  - name: Average Days To Clear (Simple)
+    expr: AVG(days_to_clear)
+    comment: "Unweighted (count-weighted) average days from posting to clearing on cleared items — every item counts equally regardless of amount. Kept as a simple reference; prefer DSO / DPO (Amount-Weighted) for a business-realistic figure."
+    format: {type: number, decimal_places: {type: max, places: 1}}
+    synonyms: [avg days to clear]

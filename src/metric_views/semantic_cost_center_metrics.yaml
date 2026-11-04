@@ -1,0 +1,118 @@
+version: 1.1
+
+source: '`${catalog}`.`${schema}`.gold_fact_journal_line'
+
+comment: "Controlling (CO) cost-center spend in local and group currency, roll-up across the standard cost-center hierarchy, and YTD time intelligence."
+
+filter: cost_center IS NOT NULL
+
+joins:
+  - name: cost_center_dim
+    source: '`${catalog}`.`${schema}`.gold_dim_cost_center'
+    on: source.controlling_area = cost_center_dim.controlling_area AND source.cost_center = cost_center_dim.cost_center
+
+dimensions:
+  - name: Posting Month
+    expr: posting_month
+    comment: Calendar month of the accounting posting date.
+
+  - name: Posting Year
+    expr: posting_year
+    comment: Calendar year of the posting date (used to reset YTD windows).
+
+  - name: Company
+    expr: company_code
+    comment: SAP company code (legal entity).
+
+  - name: Controlling Area
+    expr: controlling_area
+    comment: Controlling area of the posting.
+
+  - name: Cost Center
+    expr: cost_center
+    comment: Cost center assigned to the journal line.
+
+  - name: Cost Center Name
+    expr: cost_center_dim.cost_center_name
+    comment: Cost center name from the master dimension.
+
+  - name: Department
+    expr: cost_center_dim.department
+    comment: Department of the cost center.
+
+  - name: Cost Center Category
+    expr: cost_center_dim.cost_center_category
+    comment: Cost center category.
+
+  - name: Cost Center Hierarchy
+    expr: cost_center_dim.cost_center_hierarchy_id
+    comment: Standard hierarchy used for the rollup path.
+
+  - name: Hierarchy Level 0
+    expr: cost_center_dim.hier_level_0
+    comment: Top / group-level hierarchy node.
+    synonyms: [group node, top level]
+
+  - name: Hierarchy Level 1
+    expr: cost_center_dim.hier_level_1
+    comment: Hierarchy node at level 1.
+
+  - name: Hierarchy Level 2
+    expr: cost_center_dim.hier_level_2
+    comment: Hierarchy node at level 2.
+
+  - name: Hierarchy Level 3
+    expr: cost_center_dim.hier_level_3
+    comment: Hierarchy node at level 3.
+
+  - name: Profit Center
+    expr: profit_center
+    comment: Profit center assigned to the journal line.
+
+  - name: Account Type
+    expr: account_type_desc
+    comment: Financial account type of the posting.
+
+  - name: Currency (Local)
+    expr: company_code_currency
+    comment: Company-code (local) currency.
+
+  - name: Currency (Functional)
+    expr: functional_currency
+    comment: Functional currency. Equals company-code (local) currency in this dataset; a true group/consolidation currency is not in the shared data.
+
+measures:
+  - name: Actual Spend (Local)
+    expr: SUM(net_amount)
+    comment: Signed net posting amount on cost centers in local currency (expenses positive as debits).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [spend, net cost]
+
+  - name: Actual Spend (Functional)
+    expr: SUM(amount_in_functional_currency)
+    comment: Net posting amount on cost centers in functional currency. Equals Actual Spend (Local) in this dataset (functional = local); a true group-consolidation currency is not in the shared data.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Debit (Local)
+    expr: SUM(debit_amount)
+    comment: Sum of debit amounts on the cost center (local currency).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Credit (Local)
+    expr: SUM(credit_amount)
+    comment: Sum of credit amounts on the cost center, shown positive (local currency).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: YTD Spend (Local)
+    expr: SUM(net_amount)
+    comment: Year-to-date cost-center spend in local currency (resets each year).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [ytd spend]
+    window:
+      - {order: Posting Month, range: cumulative, semiadditive: last}
+      - {order: Posting Year, range: current, semiadditive: last}
+
+  - name: Line Count
+    expr: COUNT(1)
+    comment: Number of cost-center posting lines.
+    format: {type: number, decimal_places: {type: exact, places: 0}}

@@ -1,0 +1,211 @@
+version: 1.1
+
+source: '`${catalog}`.`${schema}`.gold_fact_journal_line'
+
+comment: "General ledger & journal-entry metrics: debit/credit/net movement in local and group currency, YTD / running-balance / rolling / period-over-period time intelligence, reversals, and controlling & intercompany dimensions."
+
+dimensions:
+  - name: Posting Month
+    expr: posting_month
+    comment: Calendar month of the accounting posting date.
+    synonyms: [month posted, posting month]
+
+  - name: Posting Date
+    expr: posting_date
+    comment: Accounting posting date of the journal line.
+
+  - name: Posting Year
+    expr: posting_year
+    comment: Calendar year of the posting date (used to reset YTD windows).
+
+  - name: Fiscal Year
+    expr: fiscal_year
+    comment: SAP fiscal year.
+
+  - name: Fiscal Period
+    expr: fiscal_period
+    comment: SAP fiscal (posting) period.
+
+  - name: Fiscal Quarter
+    expr: fiscal_quarter
+    comment: Fiscal quarter derived from the fiscal period (special periods flagged).
+
+  - name: Company
+    expr: company_code
+    comment: SAP company code (legal entity).
+    synonyms: [company code, legal entity]
+
+  - name: Ledger
+    expr: ledger
+    comment: SAP general ledger.
+
+  - name: Chart of Accounts
+    expr: chart_of_accounts
+    comment: Chart of accounts of the G/L account.
+
+  - name: G/L Account
+    expr: gl_account
+    comment: General ledger account.
+    synonyms: [gl account, account]
+
+  - name: Account Type
+    expr: account_type_desc
+    comment: Financial account type (G/L, Customer/AR, Vendor/AP, Asset, Material).
+
+  - name: Cost Center
+    expr: cost_center
+    comment: Cost center assigned to the journal line.
+
+  - name: Profit Center
+    expr: profit_center
+    comment: Profit center assigned to the journal line.
+
+  - name: Segment
+    expr: segment
+    comment: Segment assigned to the journal line.
+
+  - name: Business Area
+    expr: business_area
+    comment: Business area assigned to the journal line.
+
+  - name: Controlling Area
+    expr: controlling_area
+    comment: Controlling area of the journal line.
+
+  - name: Document Type
+    expr: accounting_document_type
+    comment: SAP accounting document type.
+
+  - name: Transaction Code
+    expr: transaction_code
+    comment: SAP transaction code from the document header.
+
+  - name: Reversal
+    expr: is_reversal
+    comment: Whether the line belongs to a reversing document.
+
+  - name: Trading Partner
+    expr: partner_company
+    comment: Partner company for intercompany reporting.
+
+  - name: Partner Segment
+    expr: partner_segment
+    comment: Trading-partner segment (intercompany / group reporting).
+
+  - name: Partner Business Area
+    expr: partner_business_area
+    comment: Trading-partner business area (intercompany / group reporting).
+
+  - name: Currency (Local)
+    expr: company_code_currency
+    comment: Company-code (local) currency of local amounts.
+
+  - name: Currency (Functional)
+    expr: functional_currency
+    comment: Functional currency. In this dataset it equals the company-code (local) currency for every row, so it matches Currency (Local). A true group/consolidation currency is not present in the shared data.
+
+measures:
+  # --- Volumes ---
+  - name: Journal Line Count
+    expr: COUNT(1)
+    comment: Number of journal (accounting document) lines.
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+
+  - name: Accounting Document Count
+    expr: COUNT(DISTINCT document_key)
+    comment: Number of distinct accounting documents.
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+
+  - name: Reversal Line Count
+    expr: COUNT_IF(is_reversal)
+    comment: Number of lines belonging to reversing documents.
+    format: {type: number, decimal_places: {type: exact, places: 0}}
+
+  # --- Local currency (company code currency) ---
+  - name: Debit (Local)
+    expr: SUM(debit_amount)
+    comment: Debit (Soll) amount in local currency.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Credit (Local)
+    expr: SUM(credit_amount)
+    comment: Credit (Haben) amount in local currency, shown positive.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Net Movement (Local)
+    expr: SUM(net_amount)
+    comment: "Signed net posting amount (debit minus credit) in local currency. NOTE: by double-entry, debits equal credits, so across ALL accounts this nets to ~0 — it is only meaningful within an account or account-type context (group by G/L Account or Account Type). Revenue accounts carry a credit (negative) sign; expense accounts a debit (positive) sign."
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [net amount, net posting, period amount local]
+
+  - name: Reversal Net Movement (Local)
+    expr: SUM(net_amount) FILTER (WHERE is_reversal)
+    comment: Net movement contributed by reversing documents, in local currency.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  # --- Functional currency (NOTE: functional = local in this dataset; not a true group currency) ---
+  - name: Debit (Functional)
+    expr: SUM(amount_in_functional_currency) FILTER (WHERE debit_credit_code = 'S')
+    comment: Debit amount in functional currency. In this dataset functional currency equals local currency, so this matches Debit (Local); a true group-consolidation amount is not in the shared data.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Credit (Functional)
+    expr: -SUM(amount_in_functional_currency) FILTER (WHERE debit_credit_code = 'H')
+    comment: Credit amount in functional currency, shown positive. Equals Credit (Local) in this dataset (functional = local).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Net Movement (Functional)
+    expr: SUM(amount_in_functional_currency)
+    comment: Signed net posting amount in functional currency. Equals Net Movement (Local) in this dataset (functional = local); a true group/consolidation currency is not present in the shared data.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [net movement functional]
+
+  # --- Time intelligence (local currency) ---
+  - name: YTD Net Movement (Local)
+    expr: SUM(net_amount)
+    comment: Year-to-date net movement in local currency (resets each fiscal/calendar year).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [ytd amount local, year to date]
+    window:
+      - {order: Posting Month, range: cumulative, semiadditive: last}
+      - {order: Posting Year, range: current, semiadditive: last}
+
+  - name: Closing Balance (Local)
+    expr: SUM(net_amount)
+    comment: "Running (cumulative) balance in local currency across all periods; anchored at the 2012 data start, not account inception. IMPORTANT: only meaningful for balance-sheet accounts (assets/liabilities/equity), which carry balances forward. P&L accounts (revenue/expense) close to retained earnings each fiscal year, so a multi-year cumulative for a P&L account is NOT a real balance — always filter to a specific account or a balance-sheet account type before using this."
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [closing balance local, running balance, cumulative balance]
+    window:
+      - {order: Posting Month, range: cumulative, semiadditive: last}
+
+  - name: Rolling 12M Net Movement (Local)
+    expr: SUM(net_amount)
+    comment: Trailing twelve-month net movement in local currency.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [ttm, trailing twelve months]
+    window:
+      - {order: Posting Month, range: trailing 12 month, semiadditive: last}
+
+  - name: Prior Month Net Movement (Local)
+    expr: SUM(net_amount)
+    comment: Previous month's net movement in local currency.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    window:
+      - {order: Posting Month, range: trailing 1 month, semiadditive: last}
+
+  - name: MoM Net Movement Growth %
+    expr: >-
+      CASE
+        WHEN MEASURE(`Prior Month Net Movement (Local)`) IS NULL
+          OR MEASURE(`Prior Month Net Movement (Local)`) = 0 THEN NULL
+        ELSE (MEASURE(`Net Movement (Local)`) - MEASURE(`Prior Month Net Movement (Local)`))
+             / ABS(MEASURE(`Prior Month Net Movement (Local)`)) * 100
+      END
+    comment: "Month-over-month growth of net movement (local currency), percent. Denominator uses the ABS of the prior month so the sign reflects genuine growth/decline (not a flip from a negative base), and returns NULL when the prior month is zero. Like any period-over-period ratio it is only meaningful at an account or account-type grain — at aggregate, net movement hovers near zero (double-entry) and the ratio is unstable."
+    format: {type: number, decimal_places: {type: max, places: 1}}
+
+  # --- Quality ---
+  - name: Average Entry Lag Days
+    expr: AVG(entry_lag_days)
+    comment: Average days between posting date and document entry (creation) date.
+    format: {type: number, decimal_places: {type: max, places: 1}}

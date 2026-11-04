@@ -1,0 +1,3405 @@
+{
+  "datasets": [
+    {
+      "name": "gl_month",
+      "displayName": "gl_month",
+      "queryLines": [
+        "SELECT CAST(`Posting Year` AS INT) AS fiscal_year, `Company` AS company, `Posting Month` AS month,\n `Account Type` AS account_type,\n MEASURE(`Net Movement (Local)`) AS net_movement, MEASURE(`Debit (Local)`) AS debit,\n MEASURE(`Credit (Local)`) AS credit, MEASURE(`Journal Line Count`) AS line_count,\n MEASURE(`Reversal Line Count`) AS reversal_lines, MEASURE(`Accounting Document Count`) AS doc_count,\n MEASURE(`YTD Net Movement (Local)`) AS ytd_net\n FROM semantic_gl_journal_metrics WHERE `Posting Date` >= DATE'2022-01-01' GROUP BY 1,2,3,4"
+      ]
+    },
+    {
+      "name": "gl_account",
+      "displayName": "gl_account",
+      "queryLines": [
+        "SELECT CAST(`Posting Year` AS INT) AS fiscal_year, `Company` AS company, `G/L Account` AS gl_account,\n `Account Type` AS account_type, MEASURE(`Net Movement (Local)`) AS net_movement,\n MEASURE(`Debit (Local)`) AS debit, MEASURE(`Credit (Local)`) AS credit\n FROM semantic_gl_journal_metrics WHERE `Posting Date` >= DATE'2022-01-01' GROUP BY 1,2,3,4"
+      ]
+    },
+    {
+      "name": "gl_lag",
+      "displayName": "gl_lag",
+      "queryLines": [
+        "SELECT CAST(`Posting Year` AS INT) AS fiscal_year, `Company` AS company, `Posting Month` AS month,\n MEASURE(`Average Entry Lag Days`) AS avg_entry_lag\n FROM semantic_gl_journal_metrics WHERE `Posting Date` >= DATE'2022-01-01' GROUP BY 1,2,3"
+      ]
+    },
+    {
+      "name": "gl_debit_kpi",
+      "displayName": "gl_debit_kpi",
+      "queryLines": [
+        "SELECT CAST(`Posting Year` AS INT) AS fiscal_year, `Company` AS company,\n MEASURE(`Debit (Local)`) AS debit FROM semantic_gl_journal_metrics WHERE `Posting Date` >= DATE'2022-01-01' GROUP BY 1,2"
+      ]
+    },
+    {
+      "name": "cf_month",
+      "displayName": "cf_month",
+      "queryLines": [
+        "SELECT CAST(year(`Posting Date`) AS INT) AS fiscal_year, `Company` AS company, `Flow Month` AS month,\n `Scenario` AS scenario, MEASURE(`Net Cash Flow (Local)`) AS net_cash,\n MEASURE(`Cash Inflow (Local)`) AS cash_in, MEASURE(`Cash Outflow (Local)`) AS cash_out,\n MEASURE(`Flow Count`) AS flow_count\n FROM semantic_cash_flow_metrics WHERE `Flow Month` >= DATE'2022-01-01' AND `Flow Month` <= DATE'2026-12-31' AND `Posting Date` IS NOT NULL GROUP BY 1,2,3,4"
+      ]
+    },
+    {
+      "name": "cf_ytd_actual",
+      "displayName": "cf_ytd_actual",
+      "queryLines": [
+        "SELECT CAST(year(`Posting Date`) AS INT) AS fiscal_year, `Company` AS company, `Flow Month` AS month,\n MEASURE(`YTD Net Cash Flow (Local)`) AS ytd_cash\n FROM semantic_cash_flow_metrics WHERE `Scenario`='actual' AND `Flow Month` >= DATE'2022-01-01' AND `Flow Month` <= DATE'2026-12-31' AND `Posting Date` IS NOT NULL GROUP BY 1,2,3"
+      ]
+    },
+    {
+      "name": "cf_accuracy",
+      "displayName": "cf_accuracy",
+      "queryLines": [
+        "SELECT fiscal_year, month, actual, forecast, variance, variance_pct, accuracy_pct / 100 AS accuracy_frac FROM (\n SELECT CAST(year(`Posting Date`) AS INT) AS fiscal_year, `Flow Month` AS month,\n  MEASURE(`Actual Net Cash Flow`) AS actual, MEASURE(`Forecast Net Cash Flow`) AS forecast,\n  MEASURE(`Forecast Variance`) AS variance, MEASURE(`Forecast Variance %`) AS variance_pct,\n  MEASURE(`Forecast Accuracy %`) AS accuracy_pct\n FROM semantic_cash_flow_metrics WHERE `Flow Month` >= DATE'2022-01-01' AND `Flow Month` <= DATE'2026-12-31' AND `Posting Date` IS NOT NULL GROUP BY 1,2)\n WHERE actual IS NOT NULL AND actual <> 0"
+      ]
+    },
+    {
+      "name": "cf_actual_kpi",
+      "displayName": "cf_actual_kpi",
+      "queryLines": [
+        "SELECT CAST(year(`Posting Date`) AS INT) AS fiscal_year, `Company` AS company,\n MEASURE(`Net Cash Flow (Local)`) AS net_cash\n FROM semantic_cash_flow_metrics WHERE `Scenario`='actual' AND `Flow Month` >= DATE'2022-01-01' AND `Flow Month` <= DATE'2026-12-31' AND `Posting Date` IS NOT NULL GROUP BY 1,2"
+      ]
+    },
+    {
+      "name": "cc_hier",
+      "displayName": "cc_hier",
+      "queryLines": [
+        "SELECT CAST(`Posting Year` AS INT) AS fiscal_year, `Company` AS company,\n `Hierarchy Level 1` AS hier_l1, `Hierarchy Level 2` AS hier_l2,\n MEASURE(`Actual Spend (Local)`) AS spend, MEASURE(`Line Count`) AS line_count\n FROM semantic_cost_center_metrics WHERE `Hierarchy Level 1` IS NOT NULL AND `Posting Month` >= DATE'2022-01-01' GROUP BY 1,2,3,4"
+      ]
+    },
+    {
+      "name": "cc_top",
+      "displayName": "cc_top",
+      "queryLines": [
+        "SELECT CAST(`Posting Year` AS INT) AS fiscal_year, `Company` AS company, `Cost Center` AS cost_center,\n `Cost Center Name` AS cost_center_name, `Department` AS department,\n MEASURE(`Actual Spend (Local)`) AS spend\n FROM semantic_cost_center_metrics WHERE `Posting Month` >= DATE'2022-01-01' GROUP BY 1,2,3,4,5"
+      ]
+    },
+    {
+      "name": "cc_ytd",
+      "displayName": "cc_ytd",
+      "queryLines": [
+        "SELECT CAST(`Posting Year` AS INT) AS fiscal_year, `Company` AS company, `Posting Month` AS month,\n MEASURE(`YTD Spend (Local)`) AS ytd_spend, MEASURE(`Actual Spend (Local)`) AS spend\n FROM semantic_cost_center_metrics WHERE `Posting Month` >= DATE'2022-01-01' GROUP BY 1,2,3"
+      ]
+    },
+    {
+      "name": "oi_aging",
+      "displayName": "oi_aging",
+      "queryLines": [
+        "SELECT fiscal_year, company, ar_ap, aging_bucket,\n ABS(open_amount) AS open_amount, ABS(overdue_amount) AS overdue_amount, open_items FROM (\n SELECT CAST(year(`Posting Date`) AS INT) AS fiscal_year, `Company` AS company, `AR / AP` AS ar_ap,\n  `Aging Bucket` AS aging_bucket, MEASURE(`Open Amount`) AS open_amount,\n  MEASURE(`Overdue Amount`) AS overdue_amount, MEASURE(`Open Item Count`) AS open_items\n FROM semantic_open_items_ar_ap_metrics WHERE `Posting Date` >= DATE'2022-01-01' GROUP BY 1,2,3,4)"
+      ]
+    },
+    {
+      "name": "oi_party",
+      "displayName": "oi_party",
+      "queryLines": [
+        "SELECT fiscal_year, company, ar_ap, party, ABS(open_amount) AS open_amount FROM (\n SELECT CAST(year(`Posting Date`) AS INT) AS fiscal_year, `Company` AS company, `AR / AP` AS ar_ap,\n  COALESCE(`Supplier`, `Customer`) AS party, MEASURE(`Open Amount`) AS open_amount\n FROM semantic_open_items_ar_ap_metrics WHERE `Posting Date` >= DATE'2022-01-01' GROUP BY 1,2,3,4)"
+      ]
+    },
+    {
+      "name": "oi_dsodpo",
+      "displayName": "oi_dsodpo",
+      "queryLines": [
+        "SELECT `AR / AP` AS ar_ap, MEASURE(`DSO / DPO (Amount-Weighted)`) AS avg_days\n FROM semantic_open_items_ar_ap_metrics WHERE `Posting Date` >= DATE'2022-01-01' GROUP BY 1"
+      ]
+    },
+    {
+      "name": "kpi_dso",
+      "displayName": "kpi_dso",
+      "queryLines": [
+        "SELECT MEASURE(`DSO / DPO (Amount-Weighted)`) AS dso\n FROM semantic_open_items_ar_ap_metrics WHERE `AR / AP`='AR' AND `Posting Date` >= DATE'2022-01-01'"
+      ]
+    },
+    {
+      "name": "kpi_dpo",
+      "displayName": "kpi_dpo",
+      "queryLines": [
+        "SELECT MEASURE(`DSO / DPO (Amount-Weighted)`) AS dpo\n FROM semantic_open_items_ar_ap_metrics WHERE `AR / AP`='AP' AND `Posting Date` >= DATE'2022-01-01'"
+      ]
+    },
+    {
+      "name": "kpi_open_ar",
+      "displayName": "kpi_open_ar",
+      "queryLines": [
+        "SELECT CAST(year(`Posting Date`) AS INT) AS fiscal_year, `Company` AS company,\n MEASURE(`Open Amount`) AS open_amount FROM semantic_open_items_ar_ap_metrics WHERE `AR / AP`='AR' AND `Posting Date` >= DATE'2022-01-01' GROUP BY 1,2"
+      ]
+    },
+    {
+      "name": "kpi_open_ap",
+      "displayName": "kpi_open_ap",
+      "queryLines": [
+        "SELECT fiscal_year, company, ABS(open_amount) AS open_amount FROM (\n SELECT CAST(year(`Posting Date`) AS INT) AS fiscal_year, `Company` AS company,\n  MEASURE(`Open Amount`) AS open_amount FROM semantic_open_items_ar_ap_metrics WHERE `AR / AP`='AP' AND `Posting Date` >= DATE'2022-01-01' GROUP BY 1,2)"
+      ]
+    },
+    {
+      "name": "gauge_clear",
+      "displayName": "gauge_clear",
+      "queryLines": [
+        "SELECT MEASURE(`Cleared Item Count`) AS cleared, MEASURE(`Item Count`) AS total FROM semantic_open_items_ar_ap_metrics WHERE `Posting Date` >= DATE'2022-01-01'"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "overview",
+      "displayName": "Executive Overview",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "ov_brand",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# CONTOSO"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "ov_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Contoso \u00b7 Financial Cockpit"
+              ]
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "ov_sub",
+            "multilineTextboxSpec": {
+              "lines": [
+                "SAP FICO \u2014 General Ledger \u00b7 Controlling \u00b7 Cash & Liquidity \u00b7 Working Capital  \u00b7  Window from 2022-01 (forecast capped 2026-12)"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_debit",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_debit_kpi",
+                  "fields": [
+                    {
+                      "name": "sum(debit)",
+                      "expression": "SUM(`debit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(debit)",
+                  "displayName": "GL Debit Postings",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "GL Debit Postings"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_cash",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_actual_kpi",
+                  "fields": [
+                    {
+                      "name": "sum(net_cash)",
+                      "expression": "SUM(`net_cash`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(net_cash)",
+                  "displayName": "Net Cash Flow (Actual)",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Net Cash Flow (Actual)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_ar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_open_ar",
+                  "fields": [
+                    {
+                      "name": "sum(open_amount)",
+                      "expression": "SUM(`open_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(open_amount)",
+                  "displayName": "Open Receivables",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Open Receivables"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_ap",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_open_ap",
+                  "fields": [
+                    {
+                      "name": "sum(open_amount)",
+                      "expression": "SUM(`open_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(open_amount)",
+                  "displayName": "Open Payables",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Open Payables"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_dso",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_dso",
+                  "fields": [
+                    {
+                      "name": "dso",
+                      "expression": "`dso`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "dso",
+                  "displayName": "DSO (days)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "DSO (days)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 5,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_dpo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_dpo",
+                  "fields": [
+                    {
+                      "name": "dpo",
+                      "expression": "`dpo`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "dpo",
+                  "displayName": "DPO (days)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "DPO (days)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 5,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ov_h1",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Cash flow \u2014 actual vs forecast"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "ov_cash_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_month",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(net_cash)",
+                      "expression": "SUM(`net_cash`)"
+                    },
+                    {
+                      "name": "scenario",
+                      "expression": "`scenario`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "fieldName": "sum(net_cash)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Net Cash Flow",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "scenario",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "scenario"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Net Cash Flow by Month"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "ov_net_by_type",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "account_type",
+                      "expression": "`account_type`"
+                    },
+                    {
+                      "name": "sum(net_movement)",
+                      "expression": "SUM(`net_movement`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "account_type",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "account_type"
+                },
+                "y": {
+                  "fieldName": "sum(net_movement)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Net Movement",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "GL Net Movement by Account Type"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 9,
+            "width": 2,
+            "height": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "gl",
+      "displayName": "General Ledger / P&L",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "gl_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## General Ledger / P&L"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "gl_flt_type",
+            "queries": [
+              {
+                "name": "account_type__gl_month",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "account_type",
+                      "expression": "`account_type`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "account_type__gl_account",
+                "query": {
+                  "datasetName": "gl_account",
+                  "fields": [
+                    {
+                      "name": "account_type",
+                      "expression": "`account_type`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "account_type",
+                    "displayName": "Account Type",
+                    "queryName": "account_type__gl_month"
+                  },
+                  {
+                    "fieldName": "account_type",
+                    "displayName": "Account Type",
+                    "queryName": "account_type__gl_account"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Account Type"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "gl_docs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "sum(doc_count)",
+                      "expression": "SUM(`doc_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(doc_count)",
+                  "displayName": "Accounting Documents",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Accounting Documents"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "gl_lines",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "sum(line_count)",
+                      "expression": "SUM(`line_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(line_count)",
+                  "displayName": "Journal Lines",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Journal Lines"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "gl_rev",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "sum(reversal_lines)",
+                      "expression": "SUM(`reversal_lines`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(reversal_lines)",
+                  "displayName": "Reversal Lines",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reversal Lines"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "gl_dc_month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(debit)",
+                      "expression": "SUM(`debit`)"
+                    },
+                    {
+                      "name": "sum(credit)",
+                      "expression": "SUM(`credit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(debit)",
+                      "displayName": "Debit"
+                    },
+                    {
+                      "fieldName": "sum(credit)",
+                      "displayName": "Credit"
+                    }
+                  ],
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Debit vs Credit by Month"
+              },
+              "mark": {
+                "layout": "group"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "gl_ytd",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(ytd_net)",
+                      "expression": "SUM(`ytd_net`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "fieldName": "sum(ytd_net)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "YTD Net Movement",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "YTD Net Movement (cumulative)"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "gl_lag_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_lag",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "avg_entry_lag",
+                      "expression": "`avg_entry_lag`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "fieldName": "avg_entry_lag",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Avg Entry Lag (days)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Posting Lag \u2014 Avg Entry Lag Days"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "gl_top_acct",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gl_account",
+                  "fields": [
+                    {
+                      "name": "gl_account",
+                      "expression": "`gl_account`"
+                    },
+                    {
+                      "name": "account_type",
+                      "expression": "`account_type`"
+                    },
+                    {
+                      "name": "net_movement",
+                      "expression": "`net_movement`"
+                    },
+                    {
+                      "name": "debit",
+                      "expression": "`debit`"
+                    },
+                    {
+                      "name": "credit",
+                      "expression": "`credit`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "gl_account",
+                    "displayName": "G/L Account"
+                  },
+                  {
+                    "fieldName": "account_type",
+                    "displayName": "Type"
+                  },
+                  {
+                    "fieldName": "net_movement",
+                    "displayName": "Net Movement",
+                    "format": {
+                      "type": "number-currency",
+                      "abbreviation": "compact",
+                      "currencyCode": "EUR",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "debit",
+                    "displayName": "Debit",
+                    "format": {
+                      "type": "number-currency",
+                      "abbreviation": "compact",
+                      "currencyCode": "EUR",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 2
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "credit",
+                    "displayName": "Credit",
+                    "format": {
+                      "type": "number-currency",
+                      "abbreviation": "compact",
+                      "currencyCode": "EUR",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "G/L Accounts"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 11,
+            "width": 3,
+            "height": 5
+          }
+        }
+      ]
+    },
+    {
+      "name": "cost_center",
+      "displayName": "Cost Center / Controlling",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "cc_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Cost Center / Controlling"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "cc_flt_hier",
+            "queries": [
+              {
+                "name": "hier_l1__cc_hier",
+                "query": {
+                  "datasetName": "cc_hier",
+                  "fields": [
+                    {
+                      "name": "hier_l1",
+                      "expression": "`hier_l1`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "hier_l1",
+                    "displayName": "Hierarchy L1",
+                    "queryName": "hier_l1__cc_hier"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Hierarchy L1"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "cc_hier_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc_hier",
+                  "fields": [
+                    {
+                      "name": "hier_l1",
+                      "expression": "`hier_l1`"
+                    },
+                    {
+                      "name": "sum(spend)",
+                      "expression": "SUM(`spend`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "hier_l1",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "hier_l1"
+                },
+                "y": {
+                  "fieldName": "sum(spend)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Spend",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Spend by Hierarchy Level 1"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cc_dept_bar",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc_top",
+                  "fields": [
+                    {
+                      "name": "department",
+                      "expression": "`department`"
+                    },
+                    {
+                      "name": "sum(spend)",
+                      "expression": "SUM(`spend`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "department",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "department"
+                },
+                "y": {
+                  "fieldName": "sum(spend)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Spend",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Spend by Department"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cc_ytd_line",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc_ytd",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(ytd_spend)",
+                      "expression": "SUM(`ytd_spend`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "fieldName": "sum(ytd_spend)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "YTD Spend",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "YTD Cost-Center Spend"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cc_top_tbl",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc_top",
+                  "fields": [
+                    {
+                      "name": "cost_center",
+                      "expression": "`cost_center`"
+                    },
+                    {
+                      "name": "cost_center_name",
+                      "expression": "`cost_center_name`"
+                    },
+                    {
+                      "name": "department",
+                      "expression": "`department`"
+                    },
+                    {
+                      "name": "spend",
+                      "expression": "`spend`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "cost_center",
+                    "displayName": "Cost Center"
+                  },
+                  {
+                    "fieldName": "cost_center_name",
+                    "displayName": "Name"
+                  },
+                  {
+                    "fieldName": "department",
+                    "displayName": "Department"
+                  },
+                  {
+                    "fieldName": "spend",
+                    "displayName": "Spend",
+                    "format": {
+                      "type": "number-currency",
+                      "abbreviation": "compact",
+                      "currencyCode": "EUR",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Top Cost Centers"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 8,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cc_radial",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc_hier",
+                  "fields": [
+                    {
+                      "name": "$valueField",
+                      "expression": "`spend`"
+                    },
+                    {
+                      "name": "$colorField",
+                      "expression": "`hier_l1`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "jsonSpec": {
+                "type": "vega-lite",
+                "spec": "{\"$schema\": \"https://vega.github.io/schema/vega-lite/v6.json\", \"width\": \"container\", \"height\": \"container\", \"data\": {\"name\": \"databricks_query\"}, \"config\": {\"autosize\": {\"type\": \"fit\", \"contains\": \"padding\"}, \"font\": \"Inter\", \"range\": {\"category\": [\"#077A9D\", \"#FFAB00\", \"#00A972\", \"#FF3621\", \"#8BCAE7\", \"#AB4057\", \"#99DDB4\", \"#FCA4A1\", \"#919191\", \"#BF7080\", \"#077A9D\"]}}, \"params\": [{\"name\": \"databricks_mark_selection\", \"select\": {\"type\": \"point\", \"fields\": [\"$colorField\"]}}], \"transform\": [{\"aggregate\": [{\"op\": \"sum\", \"field\": \"$valueField\", \"as\": \"total\"}], \"groupby\": [\"$colorField\"]}], \"layer\": [{\"mark\": {\"type\": \"arc\", \"innerRadius\": 20, \"stroke\": \"#fff\"}}], \"encoding\": {\"theta\": {\"field\": \"total\", \"type\": \"quantitative\", \"stack\": true, \"sort\": \"descending\"}, \"radius\": {\"field\": \"total\", \"scale\": {\"type\": \"sqrt\", \"zero\": true}}, \"color\": {\"field\": \"$colorField\", \"type\": \"nominal\", \"title\": \"Hierarchy L1\", \"sort\": {\"field\": \"total\", \"order\": \"descending\"}, \"legend\": {\"orient\": \"right\"}}, \"tooltip\": [{\"field\": \"$colorField\", \"type\": \"nominal\", \"title\": \"Hierarchy L1\"}, {\"field\": \"total\", \"type\": \"quantitative\", \"title\": \"Spend\", \"format\": \",.0f\"}]}, \"view\": {\"stroke\": null}}"
+              }
+            },
+            "version": 1,
+            "widgetType": "custom-vega-viz",
+            "encodings": {
+              "fields": [
+                {
+                  "fieldName": "$valueField"
+                },
+                {
+                  "fieldName": "$colorField"
+                }
+              ]
+            },
+            "data": {
+              "queryName": "main_query"
+            },
+            "frame": {
+              "title": "Spend Share by Hierarchy L1 (radial)",
+              "showTitle": true
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "cash",
+      "displayName": "Cash & Liquidity",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "cf_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Cash & Liquidity"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_flt_scn",
+            "queries": [
+              {
+                "name": "scenario__cf_month",
+                "query": {
+                  "datasetName": "cf_month",
+                  "fields": [
+                    {
+                      "name": "scenario",
+                      "expression": "`scenario`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "scenario",
+                    "displayName": "Scenario",
+                    "queryName": "scenario__cf_month"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Scenario"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_kpi_actual",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_actual_kpi",
+                  "fields": [
+                    {
+                      "name": "sum(net_cash)",
+                      "expression": "SUM(`net_cash`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(net_cash)",
+                  "displayName": "Net Cash Flow (Actual)",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Net Cash Flow (Actual)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_kpi_var",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_accuracy",
+                  "fields": [
+                    {
+                      "name": "sum(variance)",
+                      "expression": "SUM(`variance`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(variance)",
+                  "displayName": "Forecast Variance (Actual \u2212 Forecast)",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Forecast Variance (Actual \u2212 Forecast)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_kpi_acc",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_accuracy",
+                  "fields": [
+                    {
+                      "name": "avg(accuracy_frac)",
+                      "expression": "AVG(`accuracy_frac`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(accuracy_frac)",
+                  "displayName": "Avg Forecast Accuracy (floored)",
+                  "format": {
+                    "type": "number-percent"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Avg Forecast Accuracy (floored)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_avf",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_month",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(net_cash)",
+                      "expression": "SUM(`net_cash`)"
+                    },
+                    {
+                      "name": "scenario",
+                      "expression": "`scenario`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "fieldName": "sum(net_cash)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Net Cash Flow",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "scenario",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "scenario"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Net Cash Flow by Month"
+              },
+              "mark": {
+                "layout": "group"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_inout",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_month",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(cash_in)",
+                      "expression": "SUM(`cash_in`)"
+                    },
+                    {
+                      "name": "sum(cash_out)",
+                      "expression": "SUM(`cash_out`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(cash_in)",
+                      "displayName": "Inflow"
+                    },
+                    {
+                      "fieldName": "sum(cash_out)",
+                      "displayName": "Outflow"
+                    }
+                  ],
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Cash Inflow vs Outflow"
+              },
+              "mark": {
+                "layout": "group"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_var_month",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_accuracy",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(variance)",
+                      "expression": "SUM(`variance`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "fieldName": "sum(variance)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Forecast Variance",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Forecast Variance by Month (Actual \u2212 Forecast)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 2,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_acc",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_accuracy",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "accuracy_frac",
+                      "expression": "`accuracy_frac`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "fieldName": "accuracy_frac",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Forecast Accuracy",
+                  "format": {
+                    "type": "number-percent"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Forecast Accuracy % (floored, months w/ actuals)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 11,
+            "width": 2,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "cf_ytd_line",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cf_ytd_actual",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(ytd_cash)",
+                      "expression": "SUM(`ytd_cash`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "month"
+                },
+                "y": {
+                  "fieldName": "sum(ytd_cash)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "YTD Net Cash (Actual)",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "YTD Net Cash Flow (Actual)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 11,
+            "width": 2,
+            "height": 5
+          }
+        }
+      ]
+    },
+    {
+      "name": "working_capital",
+      "displayName": "Working Capital (AR/AP)",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "wc_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Working Capital \u2014 AR / AP"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_flt_arap",
+            "queries": [
+              {
+                "name": "ar_ap__oi_aging",
+                "query": {
+                  "datasetName": "oi_aging",
+                  "fields": [
+                    {
+                      "name": "ar_ap",
+                      "expression": "`ar_ap`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "ar_ap__oi_party",
+                "query": {
+                  "datasetName": "oi_party",
+                  "fields": [
+                    {
+                      "name": "ar_ap",
+                      "expression": "`ar_ap`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "ar_ap__oi_dsodpo",
+                "query": {
+                  "datasetName": "oi_dsodpo",
+                  "fields": [
+                    {
+                      "name": "ar_ap",
+                      "expression": "`ar_ap`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "ar_ap",
+                    "displayName": "AR / AP",
+                    "queryName": "ar_ap__oi_aging"
+                  },
+                  {
+                    "fieldName": "ar_ap",
+                    "displayName": "AR / AP",
+                    "queryName": "ar_ap__oi_party"
+                  },
+                  {
+                    "fieldName": "ar_ap",
+                    "displayName": "AR / AP",
+                    "queryName": "ar_ap__oi_dsodpo"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "AR / AP"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_dso",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_dso",
+                  "fields": [
+                    {
+                      "name": "dso",
+                      "expression": "`dso`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "dso",
+                  "displayName": "DSO (days)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "DSO (days)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_dpo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi_dpo",
+                  "fields": [
+                    {
+                      "name": "dpo",
+                      "expression": "`dpo`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "dpo",
+                  "displayName": "DPO (days)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "DPO (days)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_dsodpo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "oi_dsodpo",
+                  "fields": [
+                    {
+                      "name": "ar_ap",
+                      "expression": "`ar_ap`"
+                    },
+                    {
+                      "name": "avg_days",
+                      "expression": "`avg_days`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "ar_ap",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "ar_ap"
+                },
+                "y": {
+                  "fieldName": "avg_days",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Days (amount-weighted)",
+                  "format": {
+                    "type": "number-plain",
+                    "abbreviation": "none",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "DSO / DPO (amount-weighted)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_aging",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "oi_aging",
+                  "fields": [
+                    {
+                      "name": "aging_bucket",
+                      "expression": "`aging_bucket`"
+                    },
+                    {
+                      "name": "sum(open_amount)",
+                      "expression": "SUM(`open_amount`)"
+                    },
+                    {
+                      "name": "ar_ap",
+                      "expression": "`ar_ap`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "aging_bucket",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "aging_bucket"
+                },
+                "y": {
+                  "fieldName": "sum(open_amount)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Open Amount",
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "ar_ap",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "ar_ap"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Open Amount by Aging Bucket"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_overdue",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "oi_aging",
+                  "fields": [
+                    {
+                      "name": "ar_ap",
+                      "expression": "`ar_ap`"
+                    },
+                    {
+                      "name": "sum(open_amount)",
+                      "expression": "SUM(`open_amount`)"
+                    },
+                    {
+                      "name": "sum(overdue_amount)",
+                      "expression": "SUM(`overdue_amount`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "ar_ap",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "ar_ap"
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(open_amount)",
+                      "displayName": "Open"
+                    },
+                    {
+                      "fieldName": "sum(overdue_amount)",
+                      "displayName": "Overdue"
+                    }
+                  ],
+                  "format": {
+                    "type": "number-currency",
+                    "abbreviation": "compact",
+                    "currencyCode": "EUR",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Open vs Overdue"
+              },
+              "mark": {
+                "layout": "group"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_party",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "oi_party",
+                  "fields": [
+                    {
+                      "name": "ar_ap",
+                      "expression": "`ar_ap`"
+                    },
+                    {
+                      "name": "party",
+                      "expression": "`party`"
+                    },
+                    {
+                      "name": "open_amount",
+                      "expression": "`open_amount`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "ar_ap",
+                    "displayName": "AR/AP"
+                  },
+                  {
+                    "fieldName": "party",
+                    "displayName": "Business Partner"
+                  },
+                  {
+                    "fieldName": "open_amount",
+                    "displayName": "Open Amount",
+                    "format": {
+                      "type": "number-currency",
+                      "abbreviation": "compact",
+                      "currencyCode": "EUR",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Open by Business Partner"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_gauge",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "gauge_clear",
+                  "fields": [
+                    {
+                      "name": "$valueField",
+                      "expression": "`cleared`"
+                    },
+                    {
+                      "name": "$totalField",
+                      "expression": "`total`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "jsonSpec": {
+                "type": "vega-lite",
+                "spec": "{\"$schema\": \"https://vega.github.io/schema/vega-lite/v6.json\", \"width\": \"container\", \"height\": \"container\", \"data\": {\"name\": \"databricks_query\"}, \"config\": {\"autosize\": {\"type\": \"fit\", \"contains\": \"padding\"}, \"font\": \"Inter\"}, \"params\": [{\"name\": \"arc_size\", \"expr\": \"220\"}, {\"name\": \"ring_max\", \"expr\": \"min(width, height) / 2 - 16\"}, {\"name\": \"ring_width\", \"expr\": \"max(12, (min(width, height) / 2) * 0.14)\"}], \"transform\": [{\"as\": \"ratio\", \"calculate\": \"datum['$valueField'] / datum['$totalField']\"}, {\"as\": \"_s\", \"calculate\": \"-2 * PI * (arc_size/2) / 360\"}, {\"as\": \"_e\", \"calculate\": \"2 * PI * (arc_size/2) / 360\"}, {\"as\": \"_re\", \"calculate\": \"datum['_s'] + (datum['_e'] - datum['_s']) * datum['ratio']\"}], \"layer\": [{\"mark\": {\"type\": \"arc\", \"color\": \"#e5e7eb\", \"theta\": {\"expr\": \"datum['_s']\"}, \"theta2\": {\"expr\": \"datum['_e']\"}, \"radius\": {\"expr\": \"ring_max\"}, \"radius2\": {\"expr\": \"ring_max - ring_width\"}, \"cornerRadius\": 10}}, {\"mark\": {\"type\": \"arc\", \"theta\": {\"expr\": \"datum['_s']\"}, \"theta2\": {\"expr\": \"datum['_re']\"}, \"radius\": {\"expr\": \"ring_max\"}, \"radius2\": {\"expr\": \"ring_max - ring_width\"}, \"cornerRadius\": 10}, \"encoding\": {\"color\": {\"value\": \"#00A972\", \"condition\": [{\"test\": \"datum['ratio'] < 0.33\", \"value\": \"#FF3621\"}, {\"test\": \"datum['ratio'] < 0.66\", \"value\": \"#FFAB00\"}]}, \"tooltip\": [{\"field\": \"$valueField\", \"type\": \"quantitative\", \"title\": \"Cleared\"}, {\"field\": \"$totalField\", \"type\": \"quantitative\", \"title\": \"Total\"}]}}, {\"mark\": {\"type\": \"text\", \"fontSize\": 34, \"fontWeight\": \"bold\", \"dy\": 2}, \"encoding\": {\"text\": {\"field\": \"ratio\", \"type\": \"quantitative\", \"format\": \".0%\"}}}]}"
+              }
+            },
+            "version": 1,
+            "widgetType": "custom-vega-viz",
+            "encodings": {
+              "fields": [
+                {
+                  "fieldName": "$valueField"
+                },
+                {
+                  "fieldName": "$totalField"
+                }
+              ]
+            },
+            "data": {
+              "queryName": "main_query"
+            },
+            "frame": {
+              "title": "AR/AP Items Cleared",
+              "showTitle": true
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 2,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "wc_gauge_note",
+            "multilineTextboxSpec": {
+              "lines": [
+                "### Collection health\nShare of AR/AP items cleared vs. total. Green >66%, amber 33-66%, red <33%."
+              ]
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 16,
+            "width": 4,
+            "height": 5
+          }
+        }
+      ]
+    },
+    {
+      "name": "filters",
+      "displayName": "Filters",
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layout": [
+        {
+          "widget": {
+            "name": "g_company",
+            "queries": [
+              {
+                "name": "company__gl_month",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__gl_account",
+                "query": {
+                  "datasetName": "gl_account",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__gl_lag",
+                "query": {
+                  "datasetName": "gl_lag",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__gl_debit_kpi",
+                "query": {
+                  "datasetName": "gl_debit_kpi",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__cf_month",
+                "query": {
+                  "datasetName": "cf_month",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__cf_ytd_actual",
+                "query": {
+                  "datasetName": "cf_ytd_actual",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__cf_actual_kpi",
+                "query": {
+                  "datasetName": "cf_actual_kpi",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__cc_hier",
+                "query": {
+                  "datasetName": "cc_hier",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__cc_top",
+                "query": {
+                  "datasetName": "cc_top",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__cc_ytd",
+                "query": {
+                  "datasetName": "cc_ytd",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__oi_aging",
+                "query": {
+                  "datasetName": "oi_aging",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__oi_party",
+                "query": {
+                  "datasetName": "oi_party",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__kpi_open_ar",
+                "query": {
+                  "datasetName": "kpi_open_ar",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "company__kpi_open_ap",
+                "query": {
+                  "datasetName": "kpi_open_ap",
+                  "fields": [
+                    {
+                      "name": "company",
+                      "expression": "`company`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__gl_month"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__gl_account"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__gl_lag"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__gl_debit_kpi"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__cf_month"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__cf_ytd_actual"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__cf_actual_kpi"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__cc_hier"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__cc_top"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__cc_ytd"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__oi_aging"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__oi_party"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__kpi_open_ar"
+                  },
+                  {
+                    "fieldName": "company",
+                    "displayName": "Company",
+                    "queryName": "company__kpi_open_ap"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Company"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "g_year",
+            "queries": [
+              {
+                "name": "fiscal_year__gl_month",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__gl_account",
+                "query": {
+                  "datasetName": "gl_account",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__gl_lag",
+                "query": {
+                  "datasetName": "gl_lag",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__gl_debit_kpi",
+                "query": {
+                  "datasetName": "gl_debit_kpi",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__cf_month",
+                "query": {
+                  "datasetName": "cf_month",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__cf_ytd_actual",
+                "query": {
+                  "datasetName": "cf_ytd_actual",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__cf_actual_kpi",
+                "query": {
+                  "datasetName": "cf_actual_kpi",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__cc_hier",
+                "query": {
+                  "datasetName": "cc_hier",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__cc_top",
+                "query": {
+                  "datasetName": "cc_top",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__cc_ytd",
+                "query": {
+                  "datasetName": "cc_ytd",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__oi_aging",
+                "query": {
+                  "datasetName": "oi_aging",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__oi_party",
+                "query": {
+                  "datasetName": "oi_party",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__kpi_open_ar",
+                "query": {
+                  "datasetName": "kpi_open_ar",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__kpi_open_ap",
+                "query": {
+                  "datasetName": "kpi_open_ap",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "fiscal_year__cf_accuracy",
+                "query": {
+                  "datasetName": "cf_accuracy",
+                  "fields": [
+                    {
+                      "name": "fiscal_year",
+                      "expression": "`fiscal_year`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__gl_month"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__gl_account"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__gl_lag"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__gl_debit_kpi"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__cf_month"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__cf_ytd_actual"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__cf_actual_kpi"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__cc_hier"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__cc_top"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__cc_ytd"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__oi_aging"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__oi_party"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__kpi_open_ar"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__kpi_open_ap"
+                  },
+                  {
+                    "fieldName": "fiscal_year",
+                    "displayName": "Fiscal Year",
+                    "queryName": "fiscal_year__cf_accuracy"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Fiscal Year"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "g_daterange",
+            "queries": [
+              {
+                "name": "month__gl_month",
+                "query": {
+                  "datasetName": "gl_month",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "month__gl_lag",
+                "query": {
+                  "datasetName": "gl_lag",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "month__cf_month",
+                "query": {
+                  "datasetName": "cf_month",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "month__cf_ytd_actual",
+                "query": {
+                  "datasetName": "cf_ytd_actual",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "month__cf_accuracy",
+                "query": {
+                  "datasetName": "cf_accuracy",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "month__cc_ytd",
+                "query": {
+                  "datasetName": "cc_ytd",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-range-picker",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "month",
+                    "displayName": "Date Range",
+                    "queryName": "month__gl_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "displayName": "Date Range",
+                    "queryName": "month__gl_lag"
+                  },
+                  {
+                    "fieldName": "month",
+                    "displayName": "Date Range",
+                    "queryName": "month__cf_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "displayName": "Date Range",
+                    "queryName": "month__cf_ytd_actual"
+                  },
+                  {
+                    "fieldName": "month",
+                    "displayName": "Date Range",
+                    "queryName": "month__cf_accuracy"
+                  },
+                  {
+                    "fieldName": "month",
+                    "displayName": "Date Range",
+                    "queryName": "month__cc_ytd"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Date Range"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#FAFAFB",
+        "dark": "#1F272D"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FFFFFF",
+        "dark": "#11171C"
+      },
+      "widgetBorderColor": {
+        "light": "#FFFFFF",
+        "dark": "#11171C"
+      },
+      "fontColor": {
+        "light": "#000000",
+        "dark": "#E8ECF0"
+      },
+      "selectionColor": {
+        "light": "#2272B4",
+        "dark": "#8ACAFF"
+      },
+      "visualizationColors": [
+        "#077A9D",
+        "#FFAB00",
+        "#00A972",
+        "#FF3621",
+        "#8BCAE7",
+        "#AB4057",
+        "#99DDB4",
+        "#FCA4A1",
+        "#919191",
+        "#BF7080",
+        "#077A9D"
+      ],
+      "widgetHeaderAlignment": "CENTER",
+      "fontFamily": "Inter",
+      "widgetPadding": 12,
+      "widgetMargin": 8,
+      "widgetCornerRadius": 8,
+      "widgetShadow": 10
+    },
+    "applyModeEnabled": false
+  }
+}

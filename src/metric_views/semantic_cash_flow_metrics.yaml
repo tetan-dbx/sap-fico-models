@@ -1,0 +1,142 @@
+version: 1.1
+
+source: '`${catalog}`.`${schema}`.gold_fact_cash_flow'
+
+comment: "Cash & liquidity metrics: inflow/outflow/net in transaction, local and group currency, actual-vs-forecast with forecast accuracy, and YTD / rolling time intelligence."
+
+dimensions:
+  - name: Flow Month
+    expr: flow_month
+    comment: Calendar month of the cash-flow posting date.
+    synonyms: [cash month, liquidity month]
+
+  - name: Flow Year
+    expr: year(posting_date)
+    comment: Calendar year of the cash-flow posting date (used to reset YTD windows).
+
+  - name: Posting Date
+    expr: posting_date
+    comment: Posting date of the cash flow.
+
+  - name: Transaction Date
+    expr: transaction_date
+    comment: Transaction date of the cash flow.
+
+  - name: Scenario
+    expr: scenario
+    comment: Whether the flow is actual or forecast.
+    synonyms: [actual or forecast, flow type]
+
+  - name: Company
+    expr: company_code
+    comment: SAP company code (legal entity).
+
+  - name: Bank
+    expr: bank_name
+    comment: Bank name (actual flows only).
+
+  - name: Bank Country
+    expr: bank_country
+    comment: Bank country/region (actual flows only).
+
+  - name: Transaction Currency
+    expr: transaction_currency
+    comment: Currency of the original transaction.
+
+  - name: Company Currency
+    expr: company_code_currency
+    comment: Company-code (local) currency.
+
+  - name: Global Currency
+    expr: global_currency
+    comment: Global (group) currency.
+
+measures:
+  - name: Net Cash Flow (Local)
+    expr: SUM(net_amount_cc)
+    comment: Signed net cash flow in local currency (inflow minus outflow).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [net liquidity, net flow]
+
+  - name: Cash Inflow (Local)
+    expr: SUM(cash_in_cc)
+    comment: Total cash inflow in local currency.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Cash Outflow (Local)
+    expr: SUM(cash_out_cc)
+    comment: Total cash outflow in local currency, shown positive.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Net Cash Flow (Transaction)
+    expr: SUM(amount_in_transaction_currency)
+    comment: Net cash flow in original transaction currency (group/filter by Transaction Currency).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Net Cash Flow (Group)
+    expr: SUM(amount_in_global_currency)
+    comment: Net cash flow in global (group) currency. Additive only within a single Global Currency (predominantly EUR, also USD/ARS) — group or filter by Global Currency for a clean consolidated total.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Actual Net Cash Flow
+    expr: SUM(net_amount_cc) FILTER (WHERE scenario = 'actual')
+    comment: Net cash flow from actual flows only (local currency).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Forecast Net Cash Flow
+    expr: SUM(net_amount_cc) FILTER (WHERE scenario = 'forecast')
+    comment: Net cash flow from forecast flows only (local currency).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+
+  - name: Forecast Variance
+    expr: SUM(net_amount_cc) FILTER (WHERE scenario = 'actual') - SUM(net_amount_cc) FILTER (WHERE scenario = 'forecast')
+    comment: Actual minus forecast net cash flow (local currency). Signed — positive means actuals came in above forecast. This is the primary FP&A/treasury forecast KPI.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [actual vs forecast, forecast miss]
+
+  - name: Forecast Variance %
+    expr: >-
+      CASE
+        WHEN SUM(net_amount_cc) FILTER (WHERE scenario = 'forecast') IS NULL
+          OR SUM(net_amount_cc) FILTER (WHERE scenario = 'forecast') = 0 THEN NULL
+        ELSE (SUM(net_amount_cc) FILTER (WHERE scenario = 'actual') - SUM(net_amount_cc) FILTER (WHERE scenario = 'forecast'))
+             / ABS(SUM(net_amount_cc) FILTER (WHERE scenario = 'forecast')) * 100
+      END
+    comment: Signed forecast variance as a percentage of forecast = 100 * (actual - forecast) / |forecast|. Positive = actuals exceeded forecast, negative = below. NULL when there is no forecast to compare against.
+    format: {type: number, decimal_places: {type: max, places: 1}}
+    synonyms: [variance percent, forecast miss percent]
+
+  - name: Forecast Accuracy %
+    expr: >-
+      CASE
+        WHEN SUM(net_amount_cc) FILTER (WHERE scenario = 'actual') IS NULL
+          OR SUM(net_amount_cc) FILTER (WHERE scenario = 'actual') = 0 THEN NULL
+        ELSE GREATEST(
+               1 - ABS(SUM(net_amount_cc) FILTER (WHERE scenario = 'actual') - SUM(net_amount_cc) FILTER (WHERE scenario = 'forecast'))
+                   / ABS(SUM(net_amount_cc) FILTER (WHERE scenario = 'actual')),
+               0) * 100
+      END
+    comment: "Forecast accuracy = 100 * (1 - |actual - forecast| / |actual|), floored at 0% so it stays bounded 0-100 (a miss larger than 100% of actual reads as 0%, not negative). NULL when there is no actual to compare against. Computed at the query display grain (non-additive)."
+    format: {type: number, decimal_places: {type: max, places: 1}}
+    synonyms: [forecast accuracy]
+
+  - name: YTD Net Cash Flow (Local)
+    expr: SUM(net_amount_cc)
+    comment: Year-to-date net cash flow in local currency (resets each year).
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    synonyms: [ytd cash]
+    window:
+      - {order: Flow Month, range: cumulative, semiadditive: last}
+      - {order: Flow Year, range: current, semiadditive: last}
+
+  - name: Rolling 12M Net Cash Flow (Local)
+    expr: SUM(net_amount_cc)
+    comment: Trailing twelve-month net cash flow in local currency.
+    format: {type: number, decimal_places: {type: exact, places: 2}}
+    window:
+      - {order: Flow Month, range: trailing 12 month, semiadditive: last}
+
+  - name: Flow Count
+    expr: COUNT(1)
+    comment: Number of cash-flow records.
+    format: {type: number, decimal_places: {type: exact, places: 0}}
